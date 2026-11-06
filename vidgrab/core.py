@@ -27,6 +27,9 @@ def build_opts(quality="best", fmt="mp4", out_dir=None, playlist=False,
         "progress_hooks": [hook] if hook else [],
         "restrictfilenames": False,
         "windowsfilenames": True,
+        "ignoreerrors": "only_download",  # skip unavailable videos, keep going
+        "retries": 5,
+        "fragment_retries": 5,
     }
     if fmt in AUDIO_FORMATS:
         opts["format"] = "bestaudio/best"
@@ -58,6 +61,23 @@ def probe(url):
     }
 
 
+class _Log:
+    def __init__(self, job):
+        self.job = job
+
+    def debug(self, msg):
+        pass
+
+    def info(self, msg):
+        pass
+
+    def warning(self, msg):
+        pass
+
+    def error(self, msg):
+        self.job.failures.append(str(msg).replace("ERROR: ", "")[:200])
+
+
 class Job:
     def __init__(self, url, **kw):
         self.id = uuid.uuid4().hex[:8]
@@ -70,6 +90,7 @@ class Job:
         self.title = url
         self.error = None
         self.cancel = False
+        self.failures = []
 
     def hook(self, d):
         if self.cancel:
@@ -90,9 +111,13 @@ class Job:
     def run(self):
         try:
             self.status = "downloading"
-            with yt_dlp.YoutubeDL(build_opts(hook=self.hook, **self.kw)) as ydl:
+            opts = build_opts(hook=self.hook, **self.kw)
+            opts["logger"] = _Log(self)
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([self.url])
             self.status = "done"
+            if self.failures:
+                self.error = f"{len(self.failures)} skipped: " + " | ".join(self.failures[:3])
         except yt_dlp.utils.DownloadCancelled:
             self.status = "cancelled"
         except Exception as e:  # noqa: BLE001
