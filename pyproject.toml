@@ -1,0 +1,17 @@
+[project]
+name = "vidgrab"
+version = "0.1.0"
+description = "Free, open-source video downloader with a local web UI and CLI, powered by yt-dlp"
+requires-python = ">=3.9"
+dependencies = ["yt-dlp>=2025.1.1", "flask>=3.0"]
+
+[project.scripts]
+vidgrab = "vidgrab.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["vidgrab"]
+package-data = { vidgrab = ["static/*"] }

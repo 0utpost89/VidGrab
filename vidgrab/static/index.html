@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VidGrab</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#14171f;--mut:#6b7280;--ac:#4f46e5;--bd:#e5e7eb}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b22;--fg:#e8eaf0;--mut:#9aa1b2;--bd:#2a2f3a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px}h1{margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+input,select,button{font:inherit;padding:9px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+#url{flex:1;min-width:200px}button.p{background:var(--ac);color:#fff;border:0;cursor:pointer}
+#meta{margin-top:10px;color:var(--mut)}.job{padding:10px 0;border-top:1px solid var(--bd)}
+.bar{height:6px;background:var(--bd);border-radius:3px;overflow:hidden;margin-top:6px}.bar>i{display:block;height:100%;background:var(--ac)}
+.s{color:var(--mut);font-size:13px}.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style></head><body><main>
+<h1>⬇️ VidGrab</h1>
+<div class="card">
+ <div class="row" style="margin-top:0"><input id="url" placeholder="Paste a video or playlist URL"><button id="check">Check</button></div>
+ <div id="meta"></div>
+ <div class="row">
+  <select id="fmt"></select><select id="q"></select>
+  <label><input type="checkbox" id="pl"> Playlist</label>
+  <label><input type="checkbox" id="sub"> Subtitles</label>
+  <button class="p" id="go">Download</button>
+ </div>
+ <div class="s" id="dir" style="margin-top:8px"></div>
+</div>
+<div class="card"><b>Downloads</b><div id="jobs" class="s">Nothing yet.</div></div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+fetch('/api/config').then(r=>r.json()).then(c=>{
+ $('fmt').innerHTML=c.formats.map(f=>`<option>${f}</option>`).join('');
+ $('q').innerHTML=c.qualities.map(q=>`<option value="${q}">${q==='best'?'Best quality':q+'p'}</option>`).join('');
+ $('dir').textContent='Saving to '+c.out_dir});
+$('check').onclick=async()=>{
+ $('meta').textContent='Checking…';
+ const r=await fetch('/api/probe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:$('url').value})});
+ const j=await r.json();
+ $('meta').textContent=j.error?'Error: '+j.error:`${j.title||''} — ${j.uploader||''}${j.is_playlist?` (playlist, ${j.count} items)`:''}`;
+ if(j.is_playlist)$('pl').checked=true};
+$('go').onclick=async()=>{
+ if(!$('url').value.trim())return;
+ await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+  url:$('url').value.trim(),format:$('fmt').value,quality:$('q').value,playlist:$('pl').checked,subtitles:$('sub').checked})});
+ $('url').value='';$('meta').textContent=''};
+async function poll(){
+ try{const js=await (await fetch('/api/jobs')).json();
+ if(js.length)$('jobs').innerHTML=js.reverse().map(j=>`<div class="job"><div class="t">${esc(j.title)}</div>
+  <div class="bar"><i style="width:${j.percent}%"></i></div>
+  <div class="s">${esc(j.status)} ${j.percent}% ${esc(j.speed)} ${j.eta?'ETA '+esc(j.eta):''} ${j.error?'— '+esc(j.error):''}
+  ${['downloading','queued'].includes(j.status)?`<a href="#" onclick="fetch('/api/jobs/${j.id}/cancel',{method:'POST'});return false">cancel</a>`:''}</div></div>`).join('')}catch(e){}
+ setTimeout(poll,1000)}
+poll();
+</script></main></body></html>
