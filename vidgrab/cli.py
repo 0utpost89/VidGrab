@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from .core import DEFAULT_DIR, FORMATS, QUALITIES, build_opts
+from .core import BROWSERS, DEFAULT_DIR, FORMATS, QUALITIES, build_opts
 import yt_dlp
 
 
@@ -17,13 +17,15 @@ def main(argv=None):
     d.add_argument("--playlist", action="store_true", help="download whole playlist")
     d.add_argument("--subs", action="store_true", help="download subtitles")
 
+    d.add_argument("--browser", choices=BROWSERS, default="none", help="use this browser's YouTube login")
+
     w = sub.add_parser("web", help="start the local web UI")
     w.add_argument("--host", default="127.0.0.1")
     w.add_argument("--port", type=int, default=8765)
 
     a = p.parse_args(argv)
     if a.cmd == "get":
-        opts = build_opts(a.quality, a.format, a.out, a.playlist, a.subs)
+        opts = build_opts(a.quality, a.format, a.out, a.playlist, a.subs, browser=a.browser)
         opts["quiet"] = False
         with yt_dlp.YoutubeDL(opts) as ydl:
             return ydl.download(a.urls)

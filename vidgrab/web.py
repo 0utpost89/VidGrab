@@ -3,7 +3,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from .core import DEFAULT_DIR, FORMATS, QUALITIES, Manager, probe
+from .core import BROWSERS, DEFAULT_DIR, FORMATS, QUALITIES, Manager, probe
 
 STATIC = Path(__file__).parent / "static"
 app = Flask(__name__, static_folder=str(STATIC))
@@ -17,7 +17,7 @@ def index():
 
 @app.get("/api/config")
 def config():
-    return jsonify(qualities=QUALITIES, formats=FORMATS, out_dir=str(DEFAULT_DIR))
+    return jsonify(qualities=QUALITIES, formats=FORMATS, browsers=BROWSERS, out_dir=str(DEFAULT_DIR))
 
 
 @app.post("/api/probe")
@@ -33,7 +33,8 @@ def api_download():
     j = request.json
     job = mgr.add(j["url"], quality=j.get("quality", "best"), fmt=j.get("format", "mp4"),
                   out_dir=j.get("out_dir") or None, playlist=bool(j.get("playlist")),
-                  subtitles=bool(j.get("subtitles")))
+                  subtitles=bool(j.get("subtitles")),
+                  browser=j.get("browser", "none"))
     return jsonify(job.to_dict())
 
 

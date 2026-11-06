@@ -1,5 +1,6 @@
 """Download engine: a thin, friendly layer over yt-dlp."""
 import os
+import re
 import threading
 import uuid
 from pathlib import Path
@@ -13,8 +14,11 @@ FORMATS = ["mp4", "mkv", "webm", "mp3", "m4a", "opus"]
 AUDIO_FORMATS = {"mp3", "m4a", "opus"}
 
 
+BROWSERS = ["none", "firefox", "chrome", "edge", "brave"]
+
+
 def build_opts(quality="best", fmt="mp4", out_dir=None, playlist=False,
-               subtitles=False, hook=None):
+               subtitles=False, hook=None, browser="none"):
     out_dir = Path(out_dir or DEFAULT_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
     tmpl = "%(playlist_title|)s/%(title).150B [%(id)s].%(ext)s" if playlist \
@@ -28,6 +32,9 @@ def build_opts(quality="best", fmt="mp4", out_dir=None, playlist=False,
         "restrictfilenames": False,
         "windowsfilenames": True,
         "ignoreerrors": "only_download",  # skip unavailable videos, keep going
+        "color": "no_color",
+        "sleep_interval": 3,        # polite pauses help avoid YouTube bot checks
+        "max_sleep_interval": 8,
         "retries": 5,
         "fragment_retries": 5,
     }
@@ -39,6 +46,8 @@ def build_opts(quality="best", fmt="mp4", out_dir=None, playlist=False,
         h = "" if quality == "best" else f"[height<={int(quality)}]"
         opts["format"] = f"bv*{h}+ba/b{h}"
         opts["merge_output_format"] = fmt
+    if browser and browser != "none":
+        opts["cookiesfrombrowser"] = (browser,)
     if subtitles:
         opts.update(writesubtitles=True, writeautomaticsub=True,
                     subtitleslangs=["en.*"])
@@ -75,7 +84,7 @@ class _Log:
         pass
 
     def error(self, msg):
-        self.job.failures.append(str(msg).replace("ERROR: ", "")[:200])
+        self.job.failures.append(re.sub(r"\x1b\[[0-9;]*m", "", str(msg)).replace("ERROR: ", "")[:200])
 
 
 class Job:
@@ -121,7 +130,8 @@ class Job:
         except yt_dlp.utils.DownloadCancelled:
             self.status = "cancelled"
         except Exception as e:  # noqa: BLE001
-            self.status, self.error = "error", str(e)
+            self.status = "error"
+            self.error = re.sub(r"\x1b\[[0-9;]*m|\[[0-9;]+m", "", str(e))
 
     def to_dict(self):
         return {k: getattr(self, k) for k in
