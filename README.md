@@ -37,3 +37,6 @@ terms of the sites you use and applicable copyright law.
 
 ## License
 MIT
+
+## Windows shortcut
+Double-click `VidGrab.bat` to install any missing pieces and start the app.
